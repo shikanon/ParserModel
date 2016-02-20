@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<websites>
+
+
+	<website domain="cnki.net" paser-engine="xpath">
+		<!--  -->
+		<url-pattern>http://epub.cnki.net/kns/brief/result.aspx.*</url-pattern>
+		<url-pattern>http://epub.cnki.net/kns/brief/brief.aspx.*</url-pattern>
+		<!-- indicate how to retrieve data from page -->
+		<!-- indicate how to retrieve outlink from page -->
+		<data-object>
+			<!-- occur value must in {"mandatory", "optional"}, default is "optional" -->
+			<!-- data-type value must in {"string", "int", "float", "boolean"}, default
+				is "string"-->
+			<field name="title-list" data-type="string" multi-value="true" occur="mandatory"
+				description="new's title">
+				<!-- list of expression -->
+				<xpath>
+					<expression>.//*[@id='ctl00']/table/tbody/tr[2]/td/table/tbody/tr/td[2]/a/script</expression>
+					<regular-match>\('(.*?)'\)</regular-match>
+				</xpath>
+			</field>
+			
+			<field name="journal-list" multi-value="true" occur="optional"
+				description="new's author">
+				<xpath>
+					<expression>.//*[@id='ctl00']/table/tbody/tr[2]/td/table/tbody/tr/td[4]/a</expression>
+				</xpath>
+			</field>
+			<field name="quote-frequency-list" multi-value="true" description="this the download frequency">
+				<!-- list of template -->
+				<xpath>
+					<expression>.//*[@id='ctl00']/table/tbody/tr[2]/td/table/tbody/tr/td[7]/a</expression>
+					<str-range start="】" end="" />
+				</xpath>
+			</field>
+		</data-object>
+		<outlinks>
+			<entity occur="mandatory" trace="true" normalize="user-function" update-interval="-1">
+				<xpath>
+					<expression>//a[@class='fz14']</expression>
+				</xpath>
+			</entity>
+			<entity occur="optional" trace="true" normalize="none" update-interval="-1">
+				<xpath>
+					<expression>.//*[@id='ctl00']/table/tbody/tr[3]/td/table/tbody/tr/td/div/a</expression>
+				</xpath>
+			</entity>
+		</outlinks>
+	</website>
+
+
+	<website domain="cnki.net" host="epub.cnki.net" paser-engine="xpath">
+		<!--  -->
+		<url-pattern>http://www.cnki.net/KCMS/detail/detail.aspx.*</url-pattern>
+		<!-- indicate how to retrieve data from page -->
+		<data-object>
+			<!-- occur value must in {"mandatory", "optional"}, default is "optional" -->
+			<!-- data-type value must in {"string", "int", "float", "boolean"}, default
+				is "string"-->
+			<field name="title" data-type="string" multi-value="false" occur="optional"
+				description="new's title">
+				<!-- list of expression -->
+				<xpath>
+					<expression>.//*[@id='chTitle']</expression>
+				</xpath>
+			</field>
+			
+			<field name="author" multi-value="false" occur="optional"
+				description="new's author">
+				<xpath>
+					<expression>.//*[@id='content']/div[1]/div[3]/div[2]/p[1]/a</expression>
+				</xpath>
+			</field>
+
+			<field name="summary" multi-value="false" occur="optional"
+				description="new's summary">
+				<xpath>
+					<expression>.//*[@id='ChDivSummary']</expression>
+				</xpath>
+			</field>
+	
+			<field name="journal" multi-value="false" occur="optional"
+				description="new's journal">
+				<xpath>
+					<expression>.//*[@id='content']/div[1]/div[3]/div[1]/div[3]/a[1]</expression>
+				</xpath>
+			</field>
+
+			<field name="ISSN-Number" multi-value="false" description="new's time">
+				<!-- list of template -->
+				<xpath>
+					<expression>.//*[@id='content']/div[1]/div[3]/div[1]/div[3]/a[4]</expression>
+					<str-range start="" end="" />
+				</xpath>
+			</field>
+
+			<field name="keywords" multi-value="false" description="keyword">
+				<!-- list of template -->
+				<xpath>
+					<expression>.//*[@id='ChDivKeyWord']/a</expression>
+				</xpath>
+			</field>
+
+			<field name="download_frequency" multi-value="false" description="this the download frequency">
+				<!-- list of template -->
+				<xpath>
+					<expression>.//*[@id='content']/div[1]/div[5]/ul/li[2]</expression>
+					<str-range start="】" end="" />
+				</xpath>
+			</field>
+		</data-object>
+	</website>
+
+</websites>

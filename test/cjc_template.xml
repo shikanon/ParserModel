@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<websites>
+	<website domain="ict.ac.cn" paser-engine="xpath">
+		<url-pattern>http://cjc.ict.ac.cn/qwjs/.*</url-pattern>
+		<!-- indicate how to retrieve data from page -->
+		<data-object>
+			<!-- occur value must in {"mandatory", "optional"}, default is "optional" -->
+			<!-- data-type value must in {"string", "int", "float", "boolean"}, default
+				is "string"-->
+			<field name="test" data-type="string" multi-value="true" occur="mandatory"
+				description="new's title">
+				<!-- list of expression -->
+				<xpath>
+					<expression>.//span/span</expression>
+				</xpath>
+			</field>
+		</data-object>
+		<outlinks>
+			<entity trace="true" normalize="none" update-interval="-1">
+				<xpath>
+					<expression>.//a</expression>
+				</xpath>
+			</entity>
+		</outlinks>
+
+	</website>
+
+</websites>

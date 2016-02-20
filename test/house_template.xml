@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<websites>
+
+
+	<website domain="gz.fang.anjuke.com" paser-engine="xpath">
+		<!--  -->
+		<url-pattern>http://gz.fang.anjuke.com/loupan/s\?p=.*</url-pattern>
+		<!-- indicate how to retrieve data from page -->
+		<!-- indicate how to retrieve outlink from page -->
+		<outlinks>
+			<entity occur="optional" trace="true" normalize="none" update-interval="-1">
+				<xpath>
+					<expression>.//*[@id='container']/div[2]/div[1]/div[4]/div/a</expression>
+				</xpath>
+			</entity>
+			<entity occur="optional" trace="true" normalize="none" update-interval="-1">
+				<xpath>
+					<expression>.//*[@id='container']/div[2]/div[1]/div[3]/div/div[1]/div[1]/h3/a</expression>
+				</xpath>
+			</entity>
+		</outlinks>
+	</website>
+
+	<website domain="gz.fang.anjuke.com" paser-engine="xpath">
+		<!--  -->
+		<url-pattern>http://gz.fang.anjuke.com/loupan/\d+</url-pattern>
+		<!-- indicate how to retrieve data from page -->
+		<!-- indicate how to retrieve outlink from page -->
+		<data-object>
+			<!-- occur value must in {"mandatory", "optional"}, default is "optional" -->
+			<!-- data-type value must in {"string", "int", "float", "boolean"}, default
+				is "string"-->
+			<field name="楼盘名称" data-type="string" multi-value="true" occur="mandatory"
+				description="小区名称">
+				<!-- list of expression -->
+				<xpath>
+					<expression>.//*[@id='j-triggerlayer']</expression>
+				</xpath>
+			</field>
+			
+			<field name="价格" multi-value="true" occur="optional"
+				description="价格,单位:元/m2">
+				<xpath>
+					<expression>.//*[@id='container']/div[1]/div[2]/div[1]/dl/dd[1]</expression>
+					<regular-match>(\d+)元</regular-match>
+				</xpath>
+			</field>
+			<field name="户型" multi-value="true" description="户型">
+				<!-- list of template -->
+				<xpath>
+					<expression>.//*[@id='container']/div[1]/div[2]/div[1]/dl/dd[3]/div/a</expression>
+				</xpath>
+			</field>
+			<field name="地址" multi-value="true" description="地址">
+				<!-- list of template -->
+				<xpath>
+					<expression>.//*[@id='container']/div[1]/div[2]/div[1]/dl/dd[4]/span</expression>
+				</xpath>
+			</field>
+			<field name="电话" multi-value="true" description="电话">
+				<!-- list of template -->
+				<xpath>
+					<expression>.//*[@id='j-triggerlayer-b']/div/p/strong[1]</expression>
+				</xpath>
+			</field>
+			<field name="开盘日期" multi-value="true" description="开盘日期">
+				<!-- list of template -->
+				<xpath>
+					<expression>.//*[@id='container']/div[1]/div[2]/div[4]/ul[1]/li[1]</expression>
+				</xpath>
+			</field>
+			<field name="交房日期" multi-value="true" description="交房日期">
+				<!-- list of template -->
+				<xpath>
+					<expression>.//*[@id='container']/div[1]/div[2]/div[4]/ul[2]/li[1]/span</expression>
+				</xpath>
+			</field>
+		</data-object>
+	</website>
+</websites>
