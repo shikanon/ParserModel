@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # coding:utf8
 # __author__ = "shikanon <shikanon@live.com>"
-#__version__ = "0.1.1"
+#__version__ = "0.2.3"
 
 import logging
 import re
@@ -12,6 +12,7 @@ from lxml.html import html5parser, tostring, fromstring
 from hashlib import md5
 from urllib.parse import urlsplit, urljoin
 from multiprocessing.dummy import Pool
+from pyquery import PyQuery
 
 
 class Parser(metaclass=ABCMeta):
@@ -78,9 +79,13 @@ class XMLParser(Parser):
 
     def parsering(self, url, content):
         # 初始化
+        # 返回值可能为空{}，也可以只有一个如{"parsered":{key2 :[value1,...],key2:[value2,...],...}}
         self.url = url
         self.content = content
-
+        try:
+            self.html_etree = etree.parse(content, etree.HTMLParser())
+        except:
+            self.html_etree = fromstring(content)
         if self.parsed_files is None:
             raise AttributeError(
                 "please use load_parsed_files function load parsed_file")
@@ -102,6 +107,10 @@ class XMLParser(Parser):
         # 初始化
         self.url = url
         self.content = content
+        try:
+            self.html_etree = etree.parse(content, etree.HTMLParser())
+        except:
+            self.html_etree = fromstring(content)
         if self.parsed_files is None:
             raise AttributeError(
                 "please use load_parsed_files function load parsed_file")
@@ -119,22 +128,23 @@ class XMLParser(Parser):
                         md5(parsed_file.encode("utf8")).hexdigest()] = True
         return test_result
 
-    def xpath_parser(self, expression, content):
+    def xpath_parser(self, expression, html_etree):
         '''
         xpath解析方法
         '''
         try:
-            html = etree.fromstring(
-                tostring(html5parser.fromstring(content)), parser=etree.HTMLParser())
-        except:
-            html = fromstring(content)
-        try:
-            express_result = html.xpath(expression)
+            express_result = html_etree.xpath(expression)
         except:
             logging.error(u"xml解析文件存在错误!xpath表达式存在错误.")
             raise AttributeError("xml_file is Error! xpath parser is incorroct,\
              please input valid xpath parser.")
         return express_result
+
+    def css_parser(self, expression, html_etree):
+        '''css解析方法
+        Return:为一个标签数组'''
+        query_tree = PyQuery(html_etree)
+        return query_tree(expression)
 
     def str_parser(self, str_value, expression_method):
         '''
@@ -205,24 +215,23 @@ class XMLParser(Parser):
         try:
             exec(expression)
             if function_name is not None:
-                exec("self.script_str_content = %s('%s')" %
+                exec("self.script_str_content = %s('''%s''')" %
                      (function_name, str_content))
                 str_content = self.script_str_content
                 del self.script_str_content
             elif "def user_parser_function" in expression:
                 exec(
-                    "self.script_str_content = user_parser_function('%s')" % str_content)
+                    "self.script_str_content = user_parser_function('''%s''')" % str_content)
                 str_content = self.script_str_content
                 del self.script_str_content
             elif "def user_normalize_function" in expression:
                 exec(
-                    "self.script_str_content = user_normalize_function('%s')" % str_content)
+                    "self.script_str_content = user_normalize_function('''%s''')" % str_content)
                 str_content = self.script_str_content
                 del self.script_str_content
             elif "def " in expression:
-                function_name = re.findall("def(.*?)\(", expression)[0]
-                exec("self.script_str_content = %s('%s')" %
-                     (function_name, str_content))
+                function_name = re.findall("def (.*?)\(", expression)[0]
+                exec("self.script_str_content = %s('''%s''')" %(function_name, str_content))
                 str_content = self.script_str_content
                 del self.script_str_content
             return str_content
@@ -269,27 +278,41 @@ class XMLParser(Parser):
                     is_match = False
         return is_match
 
-    def express_function(self, content, expression_method):
+    def express_function(self, html_etree, expression_method):
         '''
         根据expression_method方法进行循环解析
         '''
-        if expression_method["expression"] is not None:
+        if expression_method["xpath-expression"] is not None:
             values = self.xpath_parser(
-                expression_method["expression"].string, content)
+                expression_method["xpath-expression"].string, html_etree)
+        elif expression_method["css-expression"] is not None:
+            values = self.css_parser(
+                expression_method["css-expression"].string, html_etree)
         else:
-            values = content
+            values = self.content
         if isinstance(values, list):
             result_values = []
             for value in values:
-                if expression_method["used-zone"] == "field" and isinstance(value, list):
-                    value = "".join(v.text_content() for v in value)
-                elif expression_method["used-zone"] == "field" and "text_content" in dir(value):
-                    value = value.text_content()
-                elif expression_method["used-zone"] == "field" and "text" in dir(value):
-                    value = value.text
+                if expression_method["used-zone"] == "field":
+                    if isinstance(value, list):
+                        value = "".join(v.text_content() for v in value)
+                    elif expression_method["keep-tag"] == "true":
+                        value = tostring(value, encoding="utf8").decode("utf8")
+                    elif "text_content" in dir(value):
+                        value = value.text_content()
+                    elif "text" in dir(value):
+                        value = value.text
                 elif expression_method["used-zone"] == "outlink":
-                    value = [
-                        value for key, value in value.items() if key == "href"][0]
+                    #由lxml生成的类
+                    if "items" in dir(value):
+                        value = [
+                            value for key, value in value.items() if key == "href"]
+                        if value:
+                            value = value[0]
+                        else:
+                            value = None
+                    else:
+                        value = None
                 if value is None:
                     continue
                 result_values.append(
@@ -318,24 +341,33 @@ class XMLParser(Parser):
         self.set_defaut_value(field_attrs, default_attrs)
         # 调用解析方法得到values
         values = []
-        xpaths = field.findAll("xpath")
+        xpaths = field.findAll("parse")
         for xpath in xpaths:
             express = {}
             express["used-zone"] = "field"
-            express["expression"] = xpath.find("expression")
+            #是否保留html标签
+            if "keep-tag" in field_attrs:
+                express["keep-tag"] = field_attrs["keep-tag"]
+            else:
+                express["keep-tag"] = "false"
+            #xpath 或 css 都可以
+            express["xpath-expression"] = xpath.find("xpath-expression")
+            express["css-expression"] = xpath.find("css-expression")
             express["str-range"] = xpath.find("str-range")
             express["regular-match"] = xpath.find("regular-match")
             express["script-name"] = xpath.find("script-name")
             express["script"] = xpath.find("script")
-            values = self.express_function(self.content, express)
+            values = self.express_function(self.html_etree, express)
             if len(values) != 0:
                 if values[0]:
                     break
         # 类型转换
         try:
             if field_attrs["data-type"] != "string":
-                values = [
-                    exec("%s(%s)" % (field_attrs["data-type"], value)) for value in values]
+                read_values = []
+                for value in values:
+                    exec("read_values.append(%s(%s))" % (field_attrs["data-type"], value))
+                values = read_values
         except:
             logging.warn(u"xml解析文件存在错误!其中一个field的data-type存在类型错误.")
             raise AttributeError(
@@ -346,8 +378,14 @@ class XMLParser(Parser):
             if field_attrs["occur"] == "mandatory":
                 logging.warn(u" 警告：%s(%s)为必须值，但未能抓取到." %
                              (field_attrs["name"], field_attrs["description"]))
-                raise AttributeError("the field of %s(%s) is mandatory, but it can not be fetched." % (
-                    field_attrs["name"], field_attrs["description"]))
+                #raise AttributeError("the field of %s(%s) is mandatory, but it can not be fetched." % (
+                #    field_attrs["name"], field_attrs["description"]))
+        #检测是否为多值
+        if field_attrs["multi-value"] == "false":
+            try:
+                values = values[0]
+            except:
+                values = None
 
         return field_attrs["name"], values
 
@@ -360,23 +398,25 @@ class XMLParser(Parser):
         outlink_attrs = outlink.attrs
         # 添加默认值
         self.set_defaut_value(outlink_attrs, default_attrs)
-        xpaths = outlink.findAll("xpath")
+        xpaths = outlink.findAll("parse")
         urls = []
         # 解析URL
         for xpath in xpaths:
             express = {}
             express["used-zone"] = "outlink"
-            express["expression"] = xpath.find("expression")
+            #xpath 或 css 都可以
+            express["xpath-expression"] = xpath.find("xpath-expression")
+            express["css-expression"] = xpath.find("css-expression")
             express["str-range"] = xpath.find("str-range")
             express["regular-match"] = xpath.find("regular-match")
             express["script-name"] = xpath.find("script-name")
             express["script"] = xpath.find("script")
-            urls = self.express_function(self.content, express)
+            urls = self.express_function(self.html_etree, express)
             if len(urls) != 0:
                 if urls[0]:
                     break
         if not urls:
-            return [], None
+            return None, None
         # url-host检测
         urls = [urljoin(self.url, url) for url in urls if url]
         # 检测occur是否为mandatory，判断是否抛出错误
@@ -396,13 +436,6 @@ class XMLParser(Parser):
                 self.python_script, url) for url in urls]
         return urls, outlink_attrs
 
-    def thread_pool_dealing(self, function, keywork, pools=None):
-        '''开启线程模式'''
-        if pools is None:
-            pools = Pool(2)
-        result_list = pools.map(function, keywork)
-        return dict(((key,result_single[1]) for result_single in result_list for key in result_single[0]))
-
     def parser_model(self, xml):
         '''
         解析模块，将xml-pattern文件解析成配置文件
@@ -418,8 +451,6 @@ class XMLParser(Parser):
         # 解析
         fields_result = {}
         outlinks_result = {}
-        #建立线程池
-        pools = Pool(2)
         for website in websites:
             # URL匹配,不匹配则跳过
             if not self.url_match(website):
@@ -428,19 +459,45 @@ class XMLParser(Parser):
             data_object = website.find("data-object")
             if data_object:
                 fields = data_object.findAll("field")
-                outlinks_result.update(self.thread_pool_dealing(self.get_field, fields, pools))
-                #for field in fields:
-                #    field_name, field_value = self.get_field(field)
-                #    fields_result[field_name] = field_value
+                for field in fields:
+                    field_name, field_value = self.get_field(field)
+                    fields_result[field_name] = field_value
             # 链接解析
             outlink = website.find("outlinks")
             if outlink:
                 entities = outlink.findAll("entity")
-                outlinks_result.update(self.thread_pool_dealing(self.get_outlink, entities, pools))
-                #for entity in entities:
-                #    urls, outlink_metadata = self.get_outlink(entity)
-                #    if not urls:
-                #        continue
-                #    for url in urls:
-                #        outlinks_result[url] = outlink_metadata
+                for entity in entities:
+                    urls, outlink_metadata = self.get_outlink(entity)
+                    if not urls:
+                        continue
+                    for url in urls:
+                        outlinks_result[url] = outlink_metadata
         return fields_result, outlinks_result
+
+
+class Url2ReExpress(object):
+
+    def __init__(self):
+        self.urls = set()
+
+    def add_url(self, url):
+        self.urls.add(urlsplit(url))
+
+    def compare(self):
+        similar = []
+        different = []
+        if self.urls:
+            if len(set(url.path for url in self.urls)) == 1:
+                similar.append(url.scheme+url.netloc+url.path)
+            else:
+                pass
+        return similar, different
+
+    def toReExpress(self, content):
+        result = []
+        for c in content:
+            if c in [".","?","*"]:
+                result.append("\\"+c)
+            else:
+                result.append(c)
+        return "".join(result)
